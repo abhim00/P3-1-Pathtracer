@@ -1,0 +1,276 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+<style>  
+    div.padded {  
+      padding-top: 0px;  
+      padding-right: 100px;  
+      padding-bottom: 0.25in;  
+      padding-left: 100px;  
+    }  
+  </style> 
+<title>Your Name  |  CS 184</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rel="stylesheet" type="text/css" href="style.css" media="screen" />
+</head>
+<body>
+<br />
+<h1 align="middle">Assignment 3: PathTracer</h1>
+    <h2 align="middle">Abhishek Mahesh and Somya Mohindra</h2>
+
+    <div class="padded">
+        <p>
+            In this project we rendered scenes with direct and indirect lighting. We started by generating rays and finding primitive intersections of the light rays and our object. In task 2, we optimized runtime of scene rendering by using the Bounding Volume hierarchy. Then, we implemented direct illumination by using Monte Carlo estimation to perform uniform sampling across a hemisphere and importance sampling. We integrated global illumination which used russian roulette probabilities. Finally, we took our scenes and optimized runtime again using adaptive sampling to check for pixel convergence. Throughout this project we learned how to optimize path tracing and sampling to render realistic images without sacrificing quality in favor of runtime.</p>
+
+    <h2 align="middle">Part 1: Ray Generation and Intersection</h2>
+        <p>We started by normalizing the direction vector in image space to be between [0 ,1]. Then we drop the image coordinate system along the z axis of the camera coordinate system to put it into the sensor plane. Then, we position the ray so its origin matches the camera origin as seen below. We use the camera-to-world matrix transformation on the direction vector so the ray fits correctly into world space with the camera.
+        
+        To determine how the direction rays intersect with the geometric objects we used Barycentric coordinates.
+</p>
+        <div align="center">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                    <img src="images/mathimage.png" width="480px" />
+                </tr>
+            </table>
+        </div>
+        <p>The triangle intersection algorithm uses barycentric coordinates to see if our ray intersects a point within a given triangle using the parameter t within the ray. We ensured that the t-value of intersection that we calculated using the discriminant was within the range of the scene. If multiple t values satisfied the terms, we selected the earliest t-value where the ray intersected the object.
+        </p>
+         <div align="center">
+            <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/balls.png" align="middle" width="400px"/>
+                <figcaption align="middle">CBSpheres</figcaption>
+              </td>
+              <td>
+                <img src="images/banana.png" align="middle" width="400px"/>
+                <figcaption align="middle">Banana</figcaption>
+              </td>
+            </tr>
+            </table>
+        </div>
+    <h2 align="middle">Part 2: Bounding Volume Hierarchy</h2>
+        <p>After implementing Bounding Volume Hierarchy, the rendering times on nearly all scenes were much better. Namely, rendering cow.dae after only implementing part 1 took 60s on my mac whereas after implementing BVH, the same cow.dae was rendered in 5.2s. The BVH Construction algorithm starts with computing the average centroid value for each axis of every primitive within the node’s bounding box. After this, the algorithm decides which of the (x, y, or z) axis to choose to split from. In order to do this, we use the surface area as a viable heuristic. The heuristic was designed as equalling the surface area for each of the possible split points on each of the axes and multiplying that area by the number of primitives within the bounding box. This relaxes the problem and serves as an admissible heuristic for determining which axis to split on. During implementation, I tried another alternative which simply chose the largest value axis to split on. In doing so the resulting image’s bounding boxes were splitting biased towards one axis which created an awkward resulting bounding box image. Lastly, all the images in this part had rendered under 270s. </p>
+        <div align="middle">
+          <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/part21.png" align="middle" width="400px"/>
+                <figcaption align="middle">Cow</figcaption>
+              </td>
+              <td>
+                <img src="images/part22.png" align="middle" width="400px"/>
+                <figcaption align="middle">Max Planck</figcaption>
+              </td>
+            </tr>
+            <br>
+            <tr>
+              <td>
+                <img src="images/part23.png" align="middle" width="400px"/>
+                <figcaption align="middle">Greek Goddess</figcaption>
+              </td>
+               <td>
+                <img src="images/cowbvh.png" align="middle" width="400px"/>
+                <figcaption align="middle">BVH Visualization</figcaption>
+              </td>
+            </tr>
+          </table>
+        </div>
+    <h2 align="middle">Part 3: Direct Illumination</h2>
+        <p>Uniform sampling across a hemisphere at point of intersections:
+In the bsdf.cpp, we calculated pdf as 1/2pi. Then for all samples, we used hemisphereSampler() built-in function to get a sample of the ray direction, and converted this vector to world coordinates. Using this direction vector (wj), we constructed a sample ray using hit_p, our intersection point as the ray’s start. We calculate the incoming radiance from this ray if it intersects the BVH calculated above. We convert the emitted light to irradiance by multiplying it by the cosine of the object direction vector. We take the average of all samples and divide it by the pdf to estimate the Monte Carlo.
+Importance sampling samples every light in the scene. For every light, we conduct a similar process to the Monte Carlo estimation in hemisphere sampling. However, we only calculate the radiance if the light is not blocked (aka. The cosine term of the direction vector is greater than 0) and that the shadow ray is not blocked by checking that the bvh does not intersect the shadow ray. Again we take the average of all samples for each light and sum those together in the end.
+</p>
+        <div align="center">
+            <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/lessnoisyimpsamp.png" align="middle" width="400px"/>
+                <figcaption align="middle">Less noisy with importance sampling</figcaption>
+              </td>
+              <td>
+                <img src="images/uniformhemsamp.png" align="middle" width="400px"/>
+                <figcaption align="middle">Uniform Hemisphere Sampling</figcaption>
+              </td>
+            </tr>
+            </table>
+        </div>
+        <p>USING CBBunny.png and 1 sample per pixel</p>
+        <div align="middle">
+          <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/1lr.png" align="middle" width="400px"/>
+                <figcaption align="middle">1 Light Ray</figcaption>
+              </td>
+              <td>
+                <img src="images/4lr.png" align="middle" width="400px"/>
+                <figcaption align="middle">4 Light Rays</figcaption>
+              </td>
+            </tr>
+            <br>
+            <tr>
+              <td>
+                <img src="images/16lr.png" align="middle" width="400px"/>
+                <figcaption align="middle">16 Light Rays</figcaption>
+              </td>
+               <td>
+                <img src="images/64lr.png" align="middle" width="400px"/>
+                <figcaption align="middle">64 Light Rays</figcaption>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+    <h2 align="middle">Part 4: Global Illumination</h2>
+        <p>Global illumination allows us to trace light rays as they bounce multiple times throughout a scene. The global illumination function returns the summation of zero_bounce_radiance (or the radiance of a light that goes directly to the camera and at_least_one_bounce_radiance. This function uses Russian Roulette to provide us with an unbiased method of random termination. This allows us to speed up runtime by not tracing all light rays forever. We used a continuation probability of 0.7. If our coin flip says we should continue tracing the light ray we sample the ray and add its Monte Carlo estimate to L_out along with a recursive call to at_least_one_bounce_radiance. We continue this process of randomly choosing which rays to follow until the depth of the ray we are trying to sample reaches below 1, if our ray intersects the BVH or if the light is blocked (cosine term is not > 0). 
+        </p>
+        <div align="middle">
+          <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/global_illumination_1024px_image1.png" align="middle" width="400px"/>
+                <figcaption align="middle"></figcaption>
+              </td>
+              <td>
+                <img src="images/global_illuminatino_1024px_image2.png" align="middle" width="400px"/>
+                <figcaption align="middle"></figcaption>
+              </td>
+            </tr>
+          </table>
+        </div>
+
+        <p>1024 Samples Per Pixel</p>
+        <p>We can see in indirect illumination that the spheres glow from light bouncing across the scene in a way that mimics real life better than the direct illumination image portrays. </p>
+        <div align="middle">
+          <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/direct_illumination_image3.png" align="middle" width="400px"/>
+                <figcaption align="middle">Direct Illumination</figcaption>
+              </td>
+              <td>
+                <img src="images/indirect_illumination_image4.png" align="middle" width="400px"/>
+                <figcaption align="middle">Indirect Illumination</figcaption>
+              </td>
+            </tr>
+          </table>
+        </div>
+        <p>As the max_ray_depth increases, the light in our scene increases because we are increasing the number of opportunities to sample the light rays using our russian roulette model. </p>
+         <div align="middle">
+          <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/0depth.png" align="middle" width="400px"/>
+                <figcaption align="middle">Depth = 0</figcaption>
+              </td>
+              <td>
+                <img src="images/1depth.png" align="middle" width="400px"/>
+                <figcaption align="middle">Depth = 1</figcaption>
+              </td>
+            </tr>
+            <br>
+            <tr>
+              <td>
+                <img src="images/2depth.png" align="middle" width="400px"/>
+                <figcaption align="middle">Depth = 2</figcaption>
+              </td>
+               <td>
+                <img src="images/3depth.png" align="middle" width="400px"/>
+                <figcaption align="middle">Depth = 3</figcaption>
+              </td>
+            </tr>
+          </table>
+        </div>
+        <div align="center">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                    <img src="images/4depth.png" width="480px" />
+                    <figcaption align="middle">Depth = 100</figcaption>
+                </tr>
+            </table>
+        </div>
+        <p>As we increase sample size we increase brightness and decrease graininess and noise in the box. </p>
+        <div align="middle">
+          <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/1sampleperpixel.png" align="middle" width="400px"/>
+                <figcaption align="middle">1 sampleperpixel</figcaption>
+              </td>
+              <td>
+                <img src="images/2samplesperpixel.png" align="middle" width="400px"/>
+                <figcaption align="middle">2 samplesperpixel</figcaption>
+              </td>
+              <td>
+                <img src="images/4samplesperpixel.png" align="middle" width="400px"/>
+                <figcaption align="middle">4 samplesperpixel</figcaption>
+              </td>
+            </tr>
+            <br>
+            <tr>
+              <td>
+                <img src="images/8samplesperpixel.png" align="middle" width="400px"/>
+                <figcaption align="middle">8 samplesperpixel</figcaption>
+              </td>
+               <td>
+                <img src="images/16samplesperpixel.png" align="middle" width="400px"/>
+                <figcaption align="middle">16 samplesperpixel</figcaption>
+              </td>
+              <td>
+                <img src="images/64samplesperpixel.png" align="middle" width="400px"/>
+                <figcaption align="middle">64 samplesperpixel</figcaption>
+              </td>
+            </tr>
+          </table>
+        </div>
+        <div align="center">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                    <img src="images/1024samplesperpixel.png" width="480px" />
+                    <figcaption align="middle">1024 samplesperpixel</figcaption>
+                </tr>
+            </table>
+        </div>
+
+
+        
+    <h2 align="middle">Part 5: Adaptive Sampling</h2>
+        <p>Noise can be generally eliminated if we increase the number of samples per pixel. However, it turns out that we usually don’t have to do this uniformly for all pixels. Adaptive sampling attempts to avoid using fixed, high numbers of samples per pixel, by concentrating the samples in the more difficult parts of the image. Fundamentally, the algorithm is designed around defining the convergence of tracing n samples through a pixel. I = 1.96*SD/sqrt(n), our convergence variable, is small only when the variance is small or n is large enough which means the smaller I is the more confidently we can conclude that the pixel has converged. Specifically we check to see if the condition I <= maxTolerance*mu is satisfied and at this point, the algorithm assumes that the pixel has converged and stops tracing more rays for this pixel. 
+The image rendered with adaptive sampling is shown below. There are 2048 samples per pixel with a ray depth of 5 for global illumination. Observing the sample rate map, regions with greater surface complexity and more stark, contrasting gradients are areas that required more samples per pixel. With adaptive sampling the render time was much faster and required significantly fewer rays than without adaptive sampling. Adaptive sampling is without a doubt advantageous to use. 
+</p>
+        <div align="center">
+            <table style="width=100%">
+            <tr>
+              <td>
+                <img src="images/beforeadaptive.png" align="middle" width="400px"/>
+                <figcaption align="middle">Without Adaptive Sampling</figcaption>
+              </td>
+              <td>
+                <img src="images/afteradaptive.png" align="middle" width="400px"/>
+                <figcaption align="middle">With Adaptive Sampling</figcaption>
+              </td>
+            </tr>
+            </table>
+        </div>
+        <div align="center">
+            <table style="width=100%">
+                <tr>
+                    <td align="middle">
+                    <img src="images/sampleratemap.png" width="480px" />
+                    <figcaption align="middle">Sample Rate Map</figcaption>
+                </tr>
+            </table>
+        </div>
+
+</div>
+</body>
+</html>
+
+
+
+
